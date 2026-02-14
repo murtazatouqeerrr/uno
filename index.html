@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UNO Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="menu" class="screen">
+      <h1>🎮 UNO Game</h1>
+      <div class="avatar-selector">
+        <label>Choose Avatar:</label>
+        <div id="avatarOptions" class="avatar-grid"></div>
+      </div>
+      <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+      <button id="createRoomBtn">Create Room</button>
+      <div class="divider">OR</div>
+      <input type="text" id="roomCodeInput" placeholder="Enter room code" maxlength="6">
+      <button id="joinRoomBtn">Join Room</button>
+      <button id="settingsBtn" class="secondary-btn">⚙️ Settings</button>
+    </div>
+
+    <div id="lobby" class="screen hidden">
+      <h2>Room: <span id="roomCode"></span></h2>
+      <button id="copyLinkBtn">📋 Copy Invite Link</button>
+      <h3>Players:</h3>
+      <ul id="playerList"></ul>
+      
+      <div class="game-settings">
+        <h3>Game Rules</h3>
+        <label><input type="checkbox" id="stackingRule"> Allow Stacking +2/+4</label>
+        <label><input type="checkbox" id="jumpInRule"> Jump-In (same card)</label>
+        <label><input type="checkbox" id="sevenZeroRule"> 7-0 Rule (swap hands)</label>
+      </div>
+      
+      <button id="startGameBtn" class="hidden">Start Game</button>
+      <button id="leaveLobbyBtn">Leave</button>
+    </div>
+
+    <div id="game" class="screen hidden">
+      <div id="gameInfo">
+        <div>Room: <span id="gameRoomCode"></span></div>
+        <div>Cards in deck: <span id="deckCount"></span></div>
+        <button id="soundToggle" class="icon-btn">🔊</button>
+      </div>
+
+      <div id="currentColor">
+        Current Color: <span id="colorName">-</span>
+        <span class="color-indicator" id="colorIndicator"></span>
+      </div>
+
+      <div id="players"></div>
+
+      <div id="reactions"></div>
+
+      <div id="gameArea">
+        <div id="deck" class="card-pile">
+          <div class="card back">UNO</div>
+        </div>
+        <div id="discardPile" class="card-pile"></div>
+      </div>
+
+      <div id="hand"></div>
+      
+      <div class="game-controls">
+        <button id="unoBtn">Call UNO!</button>
+        <div class="reaction-buttons">
+          <button class="reaction-btn" data-emoji="😂">😂</button>
+          <button class="reaction-btn" data-emoji="😮">😮</button>
+          <button class="reaction-btn" data-emoji="😡">😡</button>
+          <button class="reaction-btn" data-emoji="🎉">🎉</button>
+          <button class="reaction-btn" data-emoji="👍">👍</button>
+        </div>
+      </div>
+      
+      <div id="chatBox">
+        <div id="chatMessages"></div>
+        <div class="chat-input-container">
+          <input type="text" id="chatInput" placeholder="Type a message..." maxlength="100">
+          <button id="sendChatBtn">Send</button>
+        </div>
+      </div>
+      
+      <button id="leaveGameBtn">Leave Game</button>
+    </div>
+
+    <div id="colorModal" class="modal">
+      <div class="modal-content">
+        <h2>Choose a Color</h2>
+        <div class="color-options">
+          <button class="color-btn red" data-color="red">RED</button>
+          <button class="color-btn blue" data-color="blue">BLUE</button>
+          <button class="color-btn green" data-color="green">GREEN</button>
+          <button class="color-btn yellow" data-color="yellow">YELLOW</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+      <div class="modal-content">
+        <h2>Settings</h2>
+        <label><input type="checkbox" id="soundEnabled" checked> Sound Effects</label>
+        <label><input type="checkbox" id="animationsEnabled" checked> Animations</label>
+        <button id="closeSettingsBtn">Close</button>
+      </div>
+    </div>
+
+    <div id="winner" class="screen hidden">
+      <h1>🎉 <span id="winnerName"></span> Wins!</h1>
+      <div id="matchStats" class="match-stats"></div>
+      <button id="playAgainBtn">Play Again</button>
+      <button id="backToMenuBtn">Back to Menu</button>
+      <button id="viewStatsBtn">View All Stats</button>
+    </div>
+
+    <div id="statsScreen" class="screen hidden">
+      <h2>📊 Your Statistics</h2>
+      <div id="statsContent"></div>
+      <button id="closeStatsBtn">Close</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="sounds.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
