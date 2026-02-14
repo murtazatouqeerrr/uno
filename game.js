@@ -1,4 +1,6 @@
-const socket = io();
+const socket = io(SOCKET_URL, {
+  transports: ['websocket', 'polling']
+});
 
 let currentRoom = null;
 let playerId = null;
