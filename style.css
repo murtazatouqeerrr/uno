@@ -718,3 +718,60 @@ body.warning-flash {
     height: 120px;
   }
 }
+
+.turn-timer {
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  padding: 10px 20px;
+  background: #0f3460;
+  border-radius: 10px;
+  display: none;
+}
+
+.turn-timer.active {
+  display: block;
+  animation: timerPulse 1s infinite;
+}
+
+.turn-timer.urgent {
+  background: #e94560;
+  animation: timerUrgent 0.5s infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes timerUrgent {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 10px rgba(233, 69, 96, 0.5); }
+  50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(233, 69, 96, 1); }
+}
+
+.auto-play-notification {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #e94560;
+  color: #fff;
+  padding: 15px 30px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: bold;
+  z-index: 10000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    top: -100px;
+    opacity: 0;
+  }
+  to {
+    top: 20px;
+    opacity: 1;
+  }
+}

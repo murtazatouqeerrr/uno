@@ -1,5 +1,8 @@
 const socket = io(SOCKET_URL, {
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5
 });
 
 let currentRoom = null;
@@ -7,6 +10,9 @@ let playerId = null;
 let playerName = null;
 let playerAvatar = '😀';
 let myHand = [];
+let isJoining = false; // Prevent duplicate joins
+let turnTimer = null;
+let turnTimerInterval = null;
 
 // DOM elements
 const menu = document.getElementById('menu');
@@ -57,6 +63,7 @@ const statsContent = document.getElementById('statsContent');
 const closeStatsBtn = document.getElementById('closeStatsBtn');
 
 const colorModal = document.getElementById('colorModal');
+const cancelColorBtn = document.getElementById('cancelColorBtn');
 const settingsModal = document.getElementById('settingsModal');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const soundEnabled = document.getElementById('soundEnabled');
@@ -106,17 +113,33 @@ function loadSettings() {
 
 // Event listeners
 createRoomBtn.addEventListener('click', () => {
+  if (isJoining) return; // Prevent double-click
+  
   playerName = playerNameInput.value.trim();
   if (!playerName) {
     alert('Please enter your name');
     soundManager.play('error');
     return;
   }
+  
+  isJoining = true;
+  createRoomBtn.disabled = true;
+  createRoomBtn.textContent = 'Creating...';
+  
   console.log('Creating room with:', { name: playerName, avatar: playerAvatar });
   socket.emit('createRoom', { name: playerName, avatar: playerAvatar });
+  
+  // Reset after 3 seconds if no response
+  setTimeout(() => {
+    isJoining = false;
+    createRoomBtn.disabled = false;
+    createRoomBtn.textContent = 'Create Room';
+  }, 3000);
 });
 
 joinRoomBtn.addEventListener('click', () => {
+  if (isJoining) return; // Prevent double-click
+  
   playerName = playerNameInput.value.trim();
   const code = roomCodeInput.value.trim().toUpperCase();
   if (!playerName || !code) {
@@ -124,7 +147,19 @@ joinRoomBtn.addEventListener('click', () => {
     soundManager.play('error');
     return;
   }
+  
+  isJoining = true;
+  joinRoomBtn.disabled = true;
+  joinRoomBtn.textContent = 'Joining...';
+  
   socket.emit('joinRoom', { roomCode: code, name: playerName, avatar: playerAvatar });
+  
+  // Reset after 3 seconds if no response
+  setTimeout(() => {
+    isJoining = false;
+    joinRoomBtn.disabled = false;
+    joinRoomBtn.textContent = 'Join Room';
+  }, 3000);
 });
 
 settingsBtn.addEventListener('click', () => {
@@ -207,7 +242,7 @@ viewStatsBtn.addEventListener('click', () => {
 });
 
 closeStatsBtn.addEventListener('click', () => {
-  showScreen(winner);
+  showScreen(menu);
 });
 
 // Color selection for wild cards
@@ -226,6 +261,11 @@ document.querySelectorAll('.color-btn').forEach(btn => {
   });
 });
 
+cancelColorBtn.addEventListener('click', () => {
+  colorModal.classList.remove('show');
+  pendingWildCard = null;
+});
+
 deck.addEventListener('click', () => {
   socket.emit('drawCard', currentRoom);
   currentGameStats.cardsDrawn++;
@@ -239,12 +279,20 @@ unoBtn.addEventListener('click', () => {
 
 // Socket events
 socket.on('roomCreated', (data) => {
+  isJoining = false;
+  createRoomBtn.disabled = false;
+  createRoomBtn.textContent = 'Create Room';
+  
   currentRoom = data.roomCode;
   playerId = data.playerId;
   showLobby();
 });
 
 socket.on('roomJoined', (data) => {
+  isJoining = false;
+  joinRoomBtn.disabled = false;
+  joinRoomBtn.textContent = 'Join Room';
+  
   currentRoom = data.roomCode;
   playerId = data.playerId;
   showLobby();
@@ -252,15 +300,17 @@ socket.on('roomJoined', (data) => {
 
 socket.on('playerJoined', (room) => {
   console.log('playerJoined event received:', room);
-  if (lobby.classList.contains('hidden')) {
+  if (lobby.classList.contains('hidden') && currentRoom) {
     showLobby();
   }
-  updateLobby(room);
+  if (room) {
+    updateLobby(room);
+  }
 });
 
 socket.on('playerLeft', (room) => {
   console.log('playerLeft event received:', room);
-  if (room && room.players.length > 0) {
+  if (room && room.players && room.players.length > 0) {
     updateLobby(room);
   } else {
     alert('Room closed');
@@ -270,6 +320,17 @@ socket.on('playerLeft', (room) => {
 
 socket.on('gameUpdate', (gameState) => {
   console.log('gameUpdate event received:', gameState);
+  
+  // Clear existing turn timers
+  if (turnTimer) {
+    clearTimeout(turnTimer);
+    turnTimer = null;
+  }
+  if (turnTimerInterval) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+  
   if (!game.classList.contains('hidden')) {
     updateGame(gameState);
   } else {
@@ -280,12 +341,25 @@ socket.on('gameUpdate', (gameState) => {
     updateGame(gameState);
   }
   
+  // Start turn timer if it's my turn
+  if (gameState.players && gameState.players[gameState.currentPlayerIndex]?.id === playerId) {
+    startTurnTimer();
+  }
+  
   if (gameState.winner) {
     const duration = Math.floor((Date.now() - currentGameStats.startTime) / 1000);
     saveGameStats(gameState, duration);
     soundManager.play('win');
     showWinner(gameState);
   }
+});
+
+socket.on('autoPlayed', (data) => {
+  const notification = document.createElement('div');
+  notification.className = 'auto-play-notification';
+  notification.textContent = `⏱️ ${data.playerName}'s turn timed out - auto-played`;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.remove(), 3000);
 });
 
 socket.on('unoCalled', (callerId) => {
@@ -329,11 +403,88 @@ socket.on('reaction', (data) => {
 socket.on('error', (message) => {
   alert(message);
   soundManager.play('error');
+  
+  // Reset button states
+  isJoining = false;
+  createRoomBtn.disabled = false;
+  createRoomBtn.textContent = 'Create Room';
+  joinRoomBtn.disabled = false;
+  joinRoomBtn.textContent = 'Join Room';
+});
+
+socket.on('connect', () => {
+  console.log('Connected to server');
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from server');
+  if (turnTimer) {
+    clearTimeout(turnTimer);
+    turnTimer = null;
+  }
+  if (turnTimerInterval) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+});
+
+socket.on('reconnect', () => {
+  console.log('Reconnected to server');
+  if (currentRoom) {
+    // Rejoin room after reconnection
+    socket.emit('rejoinRoom', { roomCode: currentRoom, playerId });
+  }
 });
 
 // Helper functions
+function startTurnTimer() {
+  // Clear any existing timers
+  if (turnTimer) {
+    clearTimeout(turnTimer);
+    turnTimer = null;
+  }
+  if (turnTimerInterval) {
+    clearInterval(turnTimerInterval);
+    turnTimerInterval = null;
+  }
+  
+  // Show countdown
+  let timeLeft = 10;
+  const timerDisplay = document.getElementById('turnTimer');
+  if (timerDisplay) {
+    timerDisplay.textContent = `Your turn: ${timeLeft}s`;
+    timerDisplay.classList.add('active');
+  }
+  
+  turnTimerInterval = setInterval(() => {
+    timeLeft--;
+    if (timerDisplay) {
+      timerDisplay.textContent = `Your turn: ${timeLeft}s`;
+      if (timeLeft <= 3) {
+        timerDisplay.classList.add('urgent');
+      }
+    }
+    
+    if (timeLeft <= 0) {
+      clearInterval(turnTimerInterval);
+      turnTimerInterval = null;
+      if (timerDisplay) {
+        timerDisplay.classList.remove('active', 'urgent');
+      }
+    }
+  }, 1000);
+  
+  // Set timeout for auto-play (handled by server)
+  turnTimer = setTimeout(() => {
+    if (timerDisplay) {
+      timerDisplay.classList.remove('active', 'urgent');
+    }
+  }, 10000);
+}
+
+// Helper functions
 function showScreen(screen) {
-  [menu, lobby, game, winner].forEach(s => s.classList.add('hidden'));
+  [menu, lobby, game, winner, statsScreen].forEach(s => s.classList.add('hidden'));
   screen.classList.remove('hidden');
 }
 
@@ -353,6 +504,8 @@ function showWinner(name) {
 }
 
 function updateLobby(room) {
+  if (!room || !room.players) return;
+  
   playerList.innerHTML = '';
   room.players.forEach(player => {
     const li = document.createElement('li');
